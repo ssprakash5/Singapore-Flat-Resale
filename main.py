@@ -1,16 +1,19 @@
 import streamlit as st
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder
+
+# Function to load data (optimized with caching)
+@st.cache_data(hash_funcs={pd.DataFrame: lambda _: None})
+def load_data():
+    return pd.read_csv("/content/drive/MyDrive/df.csv")
 
 # Load the dataset
-# Replace this with the actual path to your dataset
-df = pd.read_csv("/content/df.csv")
+df = load_data()
 
 # Label encoding for categorical columns
 label_encoders = {}
@@ -22,9 +25,8 @@ for col in ['town', 'flat_type', 'street_name']:
 # Feature columns
 feature_columns = ['floor_area_sqm', 'remaining_lease', 'town_encoded', 'flat_type_encoded', 'street_name_encoded']
 
-# Model options
+# Model options (without Linear Regression)
 models = {
-    'Linear Regression': LinearRegression(),
     'Decision Tree': DecisionTreeRegressor(random_state=42),
     'Random Forest': RandomForestRegressor(random_state=42),
     'XGBoost': XGBRegressor(n_estimators=100, random_state=42)
@@ -34,7 +36,6 @@ models = {
 def predict_resale_price(model, features):
     # Make predictions using the trained model
     predicted_price = model.predict(features)
-
     return predicted_price[0]
 
 # Main Streamlit app
@@ -68,11 +69,10 @@ def main():
         user_input_encoded.append(encoder.transform([st.sidebar.selectbox(f"{col}:", df[col].unique())])[0])
 
     # Fit the model
-    if model_selection != 'Linear Regression':
-        X = df[feature_columns]
-        y = df['resale_price']
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        model.fit(X_train, y_train)
+    X = df[feature_columns]
+    y = df['resale_price']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model.fit(X_train, y_train)
 
     # Button to make predictions
     if st.sidebar.button("Predict Resale Price"):
@@ -83,21 +83,21 @@ def main():
         # Display the predicted price
         st.success(f"Predicted Resale Price: SGD {predicted_price:,.2f}")
 
-        if model_selection != 'Linear Regression':
-            # Evaluate the model
-            predictions = model.predict(X_test)
-            mae = mean_absolute_error(y_test, predictions)
-            mse = mean_squared_error(y_test, predictions)
-            rmse = mean_squared_error(y_test, predictions, squared=False)
-            r_squared = r2_score(y_test, predictions)
+        # Evaluate the model
+        predictions = model.predict(X_test)
+        mae = mean_absolute_error(y_test, predictions)
+        mse = mean_squared_error(y_test, predictions)
+        rmse = mean_squared_error(y_test, predictions, squared=False)
+        r_squared = r2_score(y_test, predictions)
 
-            # Display evaluation metrics
-            st.subheader("Model Evaluation Metrics:")
-            st.write(f'Mean Absolute Error (MAE): {mae}')
-            st.write(f'Mean Squared Error (MSE): {mse}')
-            st.write(f'Root Mean Squared Error (RMSE): {rmse}')
-            st.write(f'R-squared: {r_squared}')
+        # Display evaluation metrics
+        st.subheader("Model Evaluation Metrics:")
+        st.write(f'Mean Absolute Error (MAE): {mae}')
+        st.write(f'Mean Squared Error (MSE): {mse}')
+        st.write(f'Root Mean Squared Error (RMSE): {rmse}')
+        st.write(f'R-squared: {r_squared}')
 
 # Run the Streamlit app
 if __name__ == "__main__":
     main()
+
